@@ -17,6 +17,7 @@ import org.heigit.bigspatialdata.oshpbf.parser.rx.RxOshPbfReader;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import crosby.binary.Osmformat;
+import crosby.binary.Osmformat.PrimitiveBlock;
 
 public class TypeStartFinder {
 
@@ -189,14 +190,18 @@ public class TypeStartFinder {
   }
 
   public static OSMType getType(PbfBlob blob) throws InvalidProtocolBufferException {
-    Osmformat.PrimitiveGroup group = blob.getPrimitivBlock().getPrimitivegroup(0);
-    if (group.hasDense() || group.getNodesCount() > 0)
-      return OSMType.NODE;
-    if (group.getWaysCount() > 0)
-      return OSMType.WAY;
-    if (group.getRelationsCount() > 0)
-      return OSMType.RELATION;
-    throw new IllegalArgumentException("unkown type for Pbf PrimitiveGroup!");
+    PrimitiveBlock block = blob.getPrimitivBlock();
+    if(block != null) {
+      Osmformat.PrimitiveGroup group = block.getPrimitivegroup(0);
+      if (group.hasDense() || group.getNodesCount() > 0)
+        return OSMType.NODE;
+      if (group.getWaysCount() > 0)
+        return OSMType.WAY;
+      if (group.getRelationsCount() > 0)
+        return OSMType.RELATION;
+      throw new IllegalArgumentException("unkown type for Pbf PrimitiveGroup!");
+    }
+    throw new IllegalArgumentException("block is null, could be a header pbf block instead of a data block!");
   }
 
 }
