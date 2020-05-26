@@ -11,7 +11,7 @@ import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.heigit.bigspatialdata.oshdb.index.XYGrid;
-import org.heigit.bigspatialdata.oshdb.index.zfc.ZGrid;
+import org.heigit.bigspatialdata.oshdb.tool.importer.util.ZGrid;
 import org.heigit.bigspatialdata.oshdb.util.OSHDBBoundingBox;
 import com.google.common.io.MoreFiles;
 
