@@ -6,11 +6,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
-/**
- *
- * @author Rafael Troilo <rafael.troilo@uni-heidelberg.de>
- * @author Moritz Schott <m.schott@stud.uni-heidelberg.de>
- */
 public class OSMNodeTest {
 
   public OSMNodeTest() {}
@@ -131,7 +126,7 @@ public class OSMNodeTest {
   public void testGetChangeset() {
     OSMNode instance = new OSMNode(1L, 1, new OSHDBTimestamp(1L), 1L, 1, new int[] {}, 1000000000L, 1000000000L);
     long expResult = 1L;
-    long result = instance.getChangeset();
+    long result = instance.getChangesetId();
     assertEquals(expResult, result);
   }
 

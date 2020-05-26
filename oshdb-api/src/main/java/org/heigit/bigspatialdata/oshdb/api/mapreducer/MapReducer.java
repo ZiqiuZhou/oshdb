@@ -1,6 +1,8 @@
 package org.heigit.bigspatialdata.oshdb.api.mapreducer;
 
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import com.tdunning.math.stats.TDigest;
 import java.io.IOException;
 import java.io.Serializable;
@@ -23,7 +25,6 @@ import java.util.function.DoubleUnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import org.heigit.bigspatialdata.oshdb.OSHDB;
 import org.heigit.bigspatialdata.oshdb.api.db.OSHDBDatabase;
 import org.heigit.bigspatialdata.oshdb.api.db.OSHDBJdbc;
@@ -48,11 +49,12 @@ import org.heigit.bigspatialdata.oshdb.util.OSHDBTag;
 import org.heigit.bigspatialdata.oshdb.util.OSHDBTagKey;
 import org.heigit.bigspatialdata.oshdb.util.OSHDBTimestamp;
 import org.heigit.bigspatialdata.oshdb.util.celliterator.CellIterator;
+import org.heigit.bigspatialdata.oshdb.util.exceptions.OSHDBInvalidTimestampException;
 import org.heigit.bigspatialdata.oshdb.util.exceptions.OSHDBKeytablesNotFoundException;
 import org.heigit.bigspatialdata.oshdb.util.geometry.Geo;
 import org.heigit.bigspatialdata.oshdb.util.geometry.OSHDBGeometryBuilder;
-import org.heigit.bigspatialdata.oshdb.util.tagInterpreter.DefaultTagInterpreter;
-import org.heigit.bigspatialdata.oshdb.util.tagInterpreter.TagInterpreter;
+import org.heigit.bigspatialdata.oshdb.util.taginterpreter.DefaultTagInterpreter;
+import org.heigit.bigspatialdata.oshdb.util.taginterpreter.TagInterpreter;
 import org.heigit.bigspatialdata.oshdb.util.tagtranslator.OSMTag;
 import org.heigit.bigspatialdata.oshdb.util.tagtranslator.OSMTagInterface;
 import org.heigit.bigspatialdata.oshdb.util.tagtranslator.OSMTagKey;
@@ -77,13 +79,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>
  * You can set a list of filters that are applied on the raw OSM data, for example you can filter:
+ * </p>
  * <ul>
  * <li>geometrically by an area of interest (bbox or polygon)</li>
  * <li>by osm tags (key only or key/value)</li>
  * <li>by OSM type</li>
  * <li>custom filter callback</li>
  * </ul>
- * </p>
  *
  * <p>Depending on the used data "view", the MapReducer produces either "snapshots" or evaluated
  * all modifications ("contributions") of the matching raw OSM data.</p>
@@ -195,13 +197,17 @@ public abstract class MapReducer<X> implements
   public MapReducer<X> keytables(OSHDBJdbc keytables) {
     if (keytables != this.oshdb && this.oshdb instanceof OSHDBJdbc) {
       Connection c = ((OSHDBJdbc) this.oshdb).getConnection();
+      boolean oshdbContainsKeytables = true;
       try {
         new TagTranslator(c);
+      } catch (OSHDBKeytablesNotFoundException e) {
+        // this is the expected path -> the oshdb doesn't have the key tables
+        oshdbContainsKeytables = false;
+      }
+      if (oshdbContainsKeytables) {
         LOG.warn("It looks like as if the current OSHDB comes with keytables included. "
             + "Usually this means that you should use this file's keytables "
             + "and should not set the keytables manually.");
-      } catch (OSHDBKeytablesNotFoundException e) {
-        // this is the expected path -> the oshdb doesn't have the key tables
       }
     }
     MapReducer<X> ret = this.copy();
@@ -273,7 +279,8 @@ public abstract class MapReducer<X> implements
    * Set the timestamps for which to perform the analysis.
    *
    * <p>
- *   Depending on the *View*, this has slightly different semantics:
+   * Depending on the *View*, this has slightly different semantics:
+   * </p>
    * <ul><li>
    * For the OSMEntitySnapshotView it will set the time slices at which to take the "snapshots"
    * </li><li>
@@ -281,7 +288,6 @@ public abstract class MapReducer<X> implements
    * osm contributions (only the first and last timestamp of this list are contributing).
    * </li></ul>
    * Additionally, these timestamps are used in the `aggregateByTimestamp` functionality.
-   * </p>
    *
    * @param tstamps an object (implementing the OSHDBTimestampList interface) which provides the
    *        timestamps to do the analysis for
@@ -351,7 +357,7 @@ public abstract class MapReducer<X> implements
   /**
    * Sets multiple arbitrary timestamps for which to perform the analysis.
    *
-   * <p>Note for programmers wanting to use this method to supply an arbitrary number (n>=1) of
+   * <p>Note for programmers wanting to use this method to supply an arbitrary number (n&gt;=1) of
    * timestamps: You may supply the same time string multiple times, which will be de-duplicated
    * internally. E.g. you can call the method like this:
    * <code>.timestamps(dateArr[0], dateArr[0], dateArr)</code>
@@ -394,9 +400,14 @@ public abstract class MapReducer<X> implements
    * @return a modified copy of this mapReducer (can be used to chain multiple commands together)
    */
   @Contract(pure = true)
-  public MapReducer<X> osmType(EnumSet<OSMType> typeFilter) {
+  public MapReducer<X> osmType(Set<OSMType> typeFilter) {
     MapReducer<X> ret = this.copy();
-    ret.typeFilter = typeFilter;
+    typeFilter = Sets.intersection(ret.typeFilter, typeFilter);
+    if (typeFilter.isEmpty()) {
+      ret.typeFilter = EnumSet.noneOf(OSMType.class);
+    } else {
+      ret.typeFilter = EnumSet.copyOf(typeFilter);
+    }
     return ret;
   }
 
@@ -483,7 +494,7 @@ public abstract class MapReducer<X> implements
    * Adds an osm tag filter: The analysis will be restricted to osm entities that have this tag key
    * and value.
    *
-   * @param tag the tag (key-value pair) to filter the osm entities for
+   * @param tag the tag (key-value pair or key=*) to filter the osm entities for
    * @return a modified copy of this mapReducer (can be used to chain multiple commands together)
    */
   @Contract(pure = true)
@@ -586,35 +597,46 @@ public abstract class MapReducer<X> implements
 
   /**
    * Adds an osm tag filter: The analysis will be restricted to osm entities that have at least one
-   * of the supplied tags (key=value pairs).
+   * of the supplied tags (key=value pairs or key=*).
    *
-   * @param tags the tags (key/value pairs) to filter the osm entities for
+   * @param tags the tags (key/value pairs or key=*) to filter the osm entities for
    * @return a modified copy of this mapReducer (can be used to chain multiple commands together)
    */
   @Contract(pure = true)
-  public MapReducer<X> osmTag(Collection<OSMTag> tags) {
+  public MapReducer<X> osmTag(Collection<? extends OSMTagInterface> tags) {
     MapReducer<X> ret = this.copy();
-    if (tags.size() == 0) {
+    if (tags.isEmpty()) {
       LOG.warn("Empty tag list. No data will match this filter.");
       ret.preFilters.add(ignored -> false);
       ret.filters.add(ignored -> false);
       return ret;
     }
+    // for the "pre"-filter which removes all entities which don't match at least one of the
+    // given tag keys
+    Set<Integer> preKeyIds = new HashSet<>();
+    // sets of tag keys and tags for the concrete entity filter: either one of these must match
     Set<Integer> keyIds = new HashSet<>();
     Set<OSHDBTag> keyValueIds = new HashSet<>();
-    for (OSMTag tag : tags) {
-      OSHDBTag keyValueId = this.getTagTranslator().getOSHDBTagOf(tag);
-      if (!keyValueId.isPresentInKeytables()) {
-        LOG.warn("Tag {}={} not found. No data will match this tag value.",
-            tag.getKey(), tag.getValue());
+    for (OSMTagInterface tag : tags) {
+      if (tag instanceof OSMTag) {
+        OSMTag keyValue = (OSMTag) tag;
+        OSHDBTag keyValueId = this.getTagTranslator().getOSHDBTagOf(keyValue);
+        if (!keyValueId.isPresentInKeytables()) {
+          LOG.warn("Tag {}={} not found. No data will match this tag value.",
+              keyValue.getKey(), keyValue.getValue());
+        } else {
+          preKeyIds.add(keyValueId.getKey());
+          keyValueIds.add(keyValueId);
+        }
       } else {
-        keyIds.add(keyValueId.getKey());
-        keyValueIds.add(keyValueId);
+        OSHDBTagKey keyId = this.getTagTranslator().getOSHDBTagKeyOf((OSMTagKey) tag);
+        preKeyIds.add(keyId.toInt());
+        keyIds.add(keyId.toInt());
       }
     }
     ret.preFilters.add(oshEntitiy -> {
       for (int key : oshEntitiy.getRawTagKeys()) {
-        if (keyIds.contains(key)) {
+        if (preKeyIds.contains(key)) {
           return true;
         }
       }
@@ -622,7 +644,7 @@ public abstract class MapReducer<X> implements
     });
     ret.filters.add(osmEntity -> {
       for (OSHDBTag oshdbTag : osmEntity.getTags()) {
-        if (keyValueIds.contains(oshdbTag)) {
+        if (keyIds.contains(oshdbTag.getKey()) || keyValueIds.contains(oshdbTag)) {
           return true;
         }
       }
@@ -837,9 +859,19 @@ public abstract class MapReducer<X> implements
       SerializableFunction<X, OSHDBTimestamp> indexer
   ) throws UnsupportedOperationException {
     final TreeSet<OSHDBTimestamp> timestamps = new TreeSet<>(this.tstamps.get());
+    final OSHDBTimestamp minTime = timestamps.first();
+    final OSHDBTimestamp maxTime = timestamps.last();
     return new MapAggregator<OSHDBTimestamp, X>(this, data -> {
       // match timestamps to the given timestamp list
-      return timestamps.floor(indexer.apply(data));
+      OSHDBTimestamp aggregationTimestamp = indexer.apply(data);
+      if (aggregationTimestamp == null
+          || aggregationTimestamp.compareTo(minTime) < 0
+          || aggregationTimestamp.compareTo(maxTime) > 0) {
+        throw new OSHDBInvalidTimestampException(
+            "Aggregation timestamp outside of time query interval."
+        );
+      }
+      return timestamps.floor(aggregationTimestamp);
     }, getZerofillTimestamps());
   }
 
@@ -899,6 +931,7 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator and combiner functions need to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the combiner
@@ -906,7 +939,6 @@ public abstract class MapReducer<X> implements
    * <li>the combiner function must be compatible with the accumulator function: `combiner(u,
    * accumulator(identitySupplier(), t)) == accumulator.apply(u, t)`</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1046,12 +1078,12 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator function needs to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the accumulator
    * function: `accumulator(identitySupplier(),x)` must be equal to `x`,</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1314,7 +1346,7 @@ public abstract class MapReducer<X> implements
       SerializableFunction<X, R> mapper,
       Iterable<Double> q
   ) throws Exception {
-    return StreamSupport.stream(q.spliterator(), false)
+    return Streams.stream(q)
         .mapToDouble(Double::doubleValue)
         .map(this.estimatedQuantiles(mapper))
         .boxed()
@@ -1542,6 +1574,7 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator and combiner functions need to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the combiner
@@ -1549,7 +1582,6 @@ public abstract class MapReducer<X> implements
    * <li>the combiner function must be compatible with the accumulator function: `combiner(u,
    * accumulator(identitySupplier(), t)) == accumulator.apply(u, t)`</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1595,6 +1627,7 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator and combiner functions need to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the combiner
@@ -1602,7 +1635,6 @@ public abstract class MapReducer<X> implements
    * <li>the combiner function must be compatible with the accumulator function: `combiner(u,
    * accumulator(identitySupplier(), t)) == accumulator.apply(u, t)`</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1641,6 +1673,7 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator and combiner functions need to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the combiner
@@ -1648,7 +1681,6 @@ public abstract class MapReducer<X> implements
    * <li>the combiner function must be compatible with the accumulator function: `combiner(u,
    * accumulator(identitySupplier(), t)) == accumulator.apply(u, t)`</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1695,6 +1727,7 @@ public abstract class MapReducer<X> implements
    * <p>
    * The combination of the used types and identity/reducer functions must make "mathematical"
    * sense:
+   * </p>
    * <ul>
    * <li>the accumulator and combiner functions need to be associative,</li>
    * <li>values generated by the identitySupplier factory must be an identity for the combiner
@@ -1702,7 +1735,6 @@ public abstract class MapReducer<X> implements
    * <li>the combiner function must be compatible with the accumulator function: `combiner(u,
    * accumulator(identitySupplier(), t)) == accumulator.apply(u, t)`</li>
    * </ul>
-   * </p>
    *
    * <p>
    * Functionally, this interface is similar to Java8 Stream's <a href=
@@ -1799,7 +1831,7 @@ public abstract class MapReducer<X> implements
       LOG.warn("area of interest not set or empty");
       return Collections.emptyList();
     }
-    return grid.bbox2CellIdRanges(this.bboxFilter, false);
+    return grid.bbox2CellIdRanges(this.bboxFilter, true);
   }
 
   // hack, so that we can use a variable that is of both Geometry and implements Polygonal (i.e.
@@ -1923,7 +1955,7 @@ public abstract class MapReducer<X> implements
 
   @Contract(pure = true)
   static <T> Set<T> uniqIdentitySupplier() {
-    return new TreeSet<>();
+    return new HashSet<>();
   }
 
   @Contract(pure = false)
@@ -1934,7 +1966,7 @@ public abstract class MapReducer<X> implements
 
   @Contract(pure = true)
   static <T> Set<T> uniqCombiner(Set<T> a, Set<T> b) {
-    HashSet<T> result = new HashSet<>(a.size() + b.size());
+    HashSet<T> result = new HashSet<>((int) Math.ceil(Math.max(a.size(), b.size()) / 0.75));
     result.addAll(a);
     result.addAll(b);
     return result;

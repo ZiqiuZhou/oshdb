@@ -1,7 +1,108 @@
-## 0.5.0 SNAPSHOT (current master)
+Changelog
+=========
 
-* oshdb-api: implemented aggregation by polygonal geometries
-* …
+## 0.6.0 SNAPSHOT (current master)
+
+* (minor) reorganize parent package: bigspatialdata-parent version bump to 1.2, rename bigspatialdata-core-parent to oshdb-parent
+
+## 0.5.9
+
+* update Ignite to version 2.8.0
+
+## 0.5.8
+
+* fix a regression in 0.5.7 when using oshdb on Ignite, restoring binary compatibility when running clients with different oshdb 0.5 versions in parallel. #235
+* fix a bug in the geometry builder utility causing exceptions to be thrown for certain invalid OSM multipolygons. #231
+
+## 0.5.7
+
+* fix regression in version 0.5.6 which made queries run slowly when executed on ignite using the (dafault) "LocalPeek" backend. #229
+* throw an exception if the `aggregateByTimestamps(callback)` is fed with timestamps outside of the query's time range. Before this change, this used to cause unspecific exceptions or undefined behaviour. #158
+* improve querying of tag from keytables. #224
+* minor bug fixes and coding clean up. #216, #198, #206
+
+## 0.5.6
+
+* fix how osm-type filters work when called multiple times: now, like with other filters, osm entity must match all supplied type filters. #157
+* osmTag filters are more flexible: when used with a list of tags, it now accepts also `tagKey=*` statements (which can be mixed with `key=value` statements as before). #209
+* fix a bug where polygonal areas of interest would throw an exception in some (rare) edge cases. #204
+
+## 0.5.5
+
+* improved performance of data [stream](https://docs.ohsome.org/java/oshdb/0.5.4/oshdb-api/org/heigit/bigspatialdata/oshdb/api/mapreducer/MapReducer.html#stream--)ing queries on ignite (using AffinityCall backend).
+* make monthly time intervals more intuitive to use. #201
+
+## 0.5.4
+
+* fix a regression where broken referential integrity in OSM data causes a crash during geometry building
+
+## 0.5.3
+
+* update Ignite to version 2.7.5
+
+## 0.5.2
+
+* fix calculation of insertIds / entities stored in too high zoom levels, which resulted in partially missing data in some queries #183
+* prevent crashes while building certain invalid multipolygon relation geometries #179
+
+## 0.5.1
+
+* oshdb-util: Fix a bug in `Geo.areaOf` when applied to polygons with holes. Before this fix, the method errorneously skipped the first inner ring when calculating the total area of a polygon. This affected geometries constructed from OSM multipolygon relations.
+* oshdb-util: Implemented `QUARTERLY`, `WEEKLY`, `DAILY`, and `HOURLY` as additional time intervals.
+
+## 0.5.0
+
+### breaking changes
+
+* JTS library was updated to version 1.16. Because this library is now maintained by a different company, import statements need to be adjusted as explained in their [JTS migration guide](https://github.com/locationtech/jts/blob/master/MIGRATION.md#jts-115). #75
+
+### bugfixes
+
+* Fix incorrect detection of deletions in queries using the ContributionView.
+* Return the correct changeset id in case of concurrent updates on entities by different changesets.
+* Fix crash while checking empty geometries resulting from erroneous OSM data. #57
+* Fix a crash when trying to build polygons on partially incomplete OSM ways. #31
+* Make importer work with "factory-settings" ignite system. #49
+
+### new features
+
+#### oshdb-api:
+
+* Refactored how result aggregation by custom groupings works. It is now possible to [combine multiple](documentation/manual/aggregation.md#combining-multiple-aggregateby) aggregation groupings.
+* Add methods to aggregate results by [sub-regions](documentation/manual/aggregation.md#aggregateByGeometry).
+* Results of data extraction queries can now also be streamed and immediately post-processed. #19
+* Include of [t-digest](https://github.com/tdunning/t-digest) algorithm to calculate estimated quantiles of results. #34
+* All backends now support query timeouts. #47 #68
+
+#### oshdb core
+
+* Tweaked data format slightly to avoid overly full grid cells at low zoom levels. #130
+
+### performance
+
+#### oshdb-api
+
+* Make the `getModificationTimestamps` method of OSHEntites faster, resulting in general performance improvement of every query, but especially when analyzing complex relations. #10
+* Improve performance of bbox-in-polygon checking routines. #33
+* Avoid unnecessary clipping of geometries. #66
+* Improve building of complex multipolygon geometries. #111
+* Many small performance improvements.
+
+#### oshdb-tool
+
+* Improve speed and functionality of the ETL module.
+
+### other changes
+
+* Source code is now released as open-source under _GNU Lesser General Public License version 3_.
+* Dependencies are updated and reduced to the minimum. Also they are now declared in the modules where needed instead of the top level. You might therefore have to declare dependencies of your code explicitly when upgrading. #79 #5
+* Drop most deprecated methods from OSHDB version 0.4.0
+* More [examples and documentation](https://github.com/GIScience/oshdb/tree/master/documentation) are available.
+* Many small bugfixes and improvements, especially for the Ignite backend. Ignite can now be considered stable and used to analyze a global data set.
+* oshdb-api: renamed some methods (`where` filter → `osmTag` and `osmEntityFilter`, `osmTypes` filter → `osmType`) and refactored some methods to accept a wider range of input objects.
+* `GeometryCollection` geometries are no longer ignored when calculating lengths or areas of features. #51
+* Restructured core OSHDB data structures to be more flexible in upcoming version changes. #138
+* Rename `getChangeset` method to `getChangesetId. #35
 
 ## 0.4.0
 

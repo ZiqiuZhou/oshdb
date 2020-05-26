@@ -37,8 +37,6 @@ import org.slf4j.LoggerFactory;
  * Longitude +180 will be wrapped around to -180. Coordinates lying on
  * grid-borders will be assigned to the north-eastern cell.
  *
- * @author Rafael Troilo <rafael.troilo@uni-heidelberg.de>
- * @author Moritz Schott <m.schott@stud.uni-heidelberg.de>
  *
  */
 public class XYGrid implements Serializable {
@@ -54,8 +52,35 @@ public class XYGrid implements Serializable {
    * @return
    */
   public static OSHDBBoundingBox getBoundingBox(final CellId cellID) {
-    XYGrid temp = new XYGrid(cellID.getZoomLevel());
-    return temp.getCellDimensions(cellID.getId());
+    XYGrid grid = new XYGrid(cellID.getZoomLevel());
+    return grid.getCellDimensions(cellID.getId());
+  }
+
+  /**
+   * Calculate the OSHDBBoundingBox of a specific GridCell.
+   *
+   * @param cellID
+   * @param enlarge
+   * @return
+   */
+  public static OSHDBBoundingBox getBoundingBox(final CellId cellID, boolean enlarge) {
+    if (!enlarge) {
+      return getBoundingBox(cellID);
+    }
+    XYGrid grid = new XYGrid(cellID.getZoomLevel());
+    long id = cellID.getId();
+    int x = (int) (id % grid.zoompow);
+    int y = (int) ((id - x) / grid.zoompow);
+    long topRightId = id;
+    if (x < grid.zoompow - 1) {
+      topRightId += 1;
+    }
+    if (y < grid.zoompow / 2 - 1) {
+      topRightId += grid.zoompow;
+    }
+    OSHDBBoundingBox result = grid.getCellDimensions(id);
+    result.add(grid.getCellDimensions(topRightId));
+    return result;
   }
 
   private final int zoom;
@@ -185,9 +210,9 @@ public class XYGrid implements Serializable {
   public long getEstimatedIdCount(final OSHDBBoundingBox data) {
     //number of Cells in x * number of cells in y
     return Math.max(
-		            (long) Math.ceil(data.getMaxLonLong() / cellWidth) - (long) Math.floor(data.getMinLonLong() / cellWidth),
-			            (long) Math.ceil(data.getMaxLatLong() / cellWidth) - (long) Math.floor(data.getMinLatLong() / cellWidth)
-				        );
+        (long) Math.ceil(data.getMaxLonLong() / cellWidth) - (long) Math.floor(data.getMinLonLong() / cellWidth),
+        (long) Math.ceil(data.getMaxLatLong() / cellWidth) - (long) Math.floor(data.getMinLatLong() / cellWidth)
+    );
   }
 
   /**

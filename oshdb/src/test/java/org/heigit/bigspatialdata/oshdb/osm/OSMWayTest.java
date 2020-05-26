@@ -7,10 +7,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
-/**
- *
- * @author Moritz Schott <m.schott@stud.uni-heidelberg.de>
- */
 public class OSMWayTest {
 
   public OSMWayTest() {}
@@ -106,7 +102,7 @@ public class OSMWayTest {
     OSMMember part = new OSMMember(1L, OSMType.NODE, 1);
     OSMWay instance = new OSMWay(1L, 1, new OSHDBTimestamp(1L), 1L, 1, new int[] {}, new OSMMember[] {part, part});
     long expResult = 1L;
-    long result = instance.getChangeset();
+    long result = instance.getChangesetId();
     assertEquals(expResult, result);
   }
 

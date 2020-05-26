@@ -22,8 +22,11 @@ public class OSHDBTimestamps implements OSHDBTimestampList {
    */
   public enum Interval {
     YEARLY("P1Y"),
+    QUARTERLY("P3M"),
     MONTHLY("P1M"),
-    DAILY("P1D");
+    WEEKLY("P1W"),
+    DAILY("P1D"),
+    HOURLY("PT1H");
 
     final String value;
     Interval(final String value) {
@@ -153,6 +156,8 @@ public class OSHDBTimestamps implements OSHDBTimestampList {
 
       Period period = (Period) steps.get("period");
       Duration duration = (Duration) steps.get("duration");
+      
+      int counter = 1;
 
       //validate start and end. start should be before end.
       if (start.isAfter(end)) {
@@ -168,7 +173,8 @@ public class OSHDBTimestamps implements OSHDBTimestampList {
 
         while (currentTimestamp.toEpochSecond() >= startTimestamp) {
           timestamps.add(currentTimestamp.toEpochSecond());
-          currentTimestamp = currentTimestamp.minus(period).minus(duration);
+          currentTimestamp = end.minus(period.multipliedBy(counter)).minus(duration.multipliedBy(counter));
+          counter++;
         }
       } else {
         ZonedDateTime currentTimestamp = ZonedDateTime.from(start);
@@ -176,7 +182,8 @@ public class OSHDBTimestamps implements OSHDBTimestampList {
 
         while (currentTimestamp.toEpochSecond() <= endTimestamp) {
           timestamps.add(currentTimestamp.toEpochSecond());
-          currentTimestamp = currentTimestamp.plus(period).plus(duration);
+          currentTimestamp = start.plus(period.multipliedBy(counter)).plus(duration.multipliedBy(counter));
+          counter++;
         }
       }
 
