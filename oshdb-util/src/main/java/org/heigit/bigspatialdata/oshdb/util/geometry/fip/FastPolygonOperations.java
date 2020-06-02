@@ -1,27 +1,27 @@
 package org.heigit.bigspatialdata.oshdb.util.geometry.fip;
 
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.locationtech.jts.geom.GeometryCollection;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryCollection;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.Polygonal;
-import java.io.Serializable;
-import java.util.ArrayList;
 
 public class FastPolygonOperations implements Serializable {
-  private final int AVERAGE_VERTICES_PER_BLOCK = 40; // todo: finetune this value
+  private static final int AVERAGE_VERTICES_PER_BLOCK = 40; // todo: finetune this value
 
-  private int numBands;
+  private final int numBands;
 
-  private ArrayList<Geometry /*Polygonal or(??) empty*/> blocks;
+  private final ArrayList<Geometry /*Polygonal or(??) empty*/> blocks;
 
-  private Envelope env;
-  private double envWidth;
-  private double envHeight;
+  private final Envelope env;
+  private final double envWidth;
+  private final double envHeight;
 
   public <P extends Geometry & Polygonal> FastPolygonOperations(P geom) {
     double optNumBands = Math.max(1.0, Math.sqrt(1.0 * geom.getNumPoints() / AVERAGE_VERTICES_PER_BLOCK));
@@ -132,20 +132,50 @@ public class FastPolygonOperations implements Serializable {
     }
   }
 
+  /**
+   * Returns the intersection of this polygon with the given other geometry.
+   *
+   * @param other an arbitrary geometry
+   * @return the intersection of this polygon with the other geometry
+   */
   public Geometry intersection(Geometry other) {
-    if (other == null || other.isEmpty()) return other;
-    Envelope otherEnv = other.getEnvelopeInternal();
+    if (other == null || other.isEmpty()) {
+      return other;
+    }
+    Geometry intersector = getIntersector(other.getEnvelopeInternal());
+    return other.intersection(intersector);
+  }
 
-    int minBandX = Math.max(0, Math.min(numBands - 1, (int)Math.floor((otherEnv.getMinX() - env.getMinX())/envWidth * numBands)));
-    int maxBandX = Math.max(0, Math.min(numBands - 1, (int)Math.floor((otherEnv.getMaxX() - env.getMinX())/envWidth * numBands)));
-    int minBandY = Math.max(0, Math.min(numBands - 1, (int)Math.floor((otherEnv.getMinY() - env.getMinY())/envHeight * numBands)));
-    int maxBandY = Math.max(0, Math.min(numBands - 1, (int)Math.floor((otherEnv.getMaxY() - env.getMinY())/envHeight * numBands)));
+  /**
+   * Returns the intersection of this polygon with the given other geometry.
+   *
+   * @param other an arbitrary geometry
+   * @return the intersection of this polygon with the other geometry
+   */
+  public boolean intersects(Geometry other) {
+    // todo: benchmark this against `PreparedGeometry.intersects()`
+    if (other == null || other.isEmpty()) {
+      return false;
+    }
+    Geometry intersector = getIntersector(other.getEnvelopeInternal());
+    return other.intersects(intersector);
+  }
+
+  private Geometry getIntersector(Envelope otherEnv) {
+    int minBandX = Math.max(0, Math.min(numBands - 1,
+        (int) Math.floor((otherEnv.getMinX() - env.getMinX()) / envWidth * numBands)));
+    int maxBandX = Math.max(0, Math.min(numBands - 1,
+        (int) Math.floor((otherEnv.getMaxX() - env.getMinX()) / envWidth * numBands)));
+    int minBandY = Math.max(0, Math.min(numBands - 1,
+        (int) Math.floor((otherEnv.getMinY() - env.getMinY()) / envHeight * numBands)));
+    int maxBandY = Math.max(0, Math.min(numBands - 1,
+        (int) Math.floor((otherEnv.getMaxY() - env.getMinY()) / envHeight * numBands)));
 
     Geometry intersector = null;
 
     for (int x = minBandX; x <= maxBandX; x++) {
       for (int y = minBandY; y <= maxBandY; y++) {
-        Geometry block = blocks.get(y + x*numBands);
+        Geometry block = blocks.get(y + x * numBands);
         if (intersector == null) {
           intersector = block;
         } else {
@@ -155,10 +185,6 @@ public class FastPolygonOperations implements Serializable {
     }
 
     assert intersector != null;
-
-    return other.intersection(intersector);
+    return intersector;
   }
-
-
-
 }

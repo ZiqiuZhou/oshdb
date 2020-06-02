@@ -20,14 +20,24 @@ public class OSMEntitySnapshot implements OSHDBMapReducible {
   }
 
   /**
-   * Creates a copy of the current entity snapshot with an updated geometry.
+   * Creates a copy of the given entity snapshot object with an updated geometry.
    */
   public OSMEntitySnapshot(OSMEntitySnapshot other, Geometry reclippedGeometry) {
+    this(other, new LazyEvaluatedObject<>(reclippedGeometry));
+  }
+
+  /**
+   * Creates a copy of the given entity snapshot object with an updated geometry.
+   */
+  public OSMEntitySnapshot(
+      OSMEntitySnapshot other,
+      LazyEvaluatedObject<Geometry> reclippedGeometry
+  ) {
     this.data = new IterateByTimestampEntry(
         other.data.timestamp,
         other.data.osmEntity,
         other.data.oshEntity,
-        new LazyEvaluatedObject<>(reclippedGeometry),
+        reclippedGeometry,
         other.data.unclippedGeometry
     );
   }
