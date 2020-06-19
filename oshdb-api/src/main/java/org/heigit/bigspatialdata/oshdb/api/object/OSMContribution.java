@@ -267,6 +267,11 @@ public class OSMContribution implements OSHDBMapReducible, Comparable<OSMContrib
     return data.changeset;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * Note: this class has a natural ordering that is inconsistent with equals.
+   */
   @Override
   public int compareTo(@Nonnull OSMContribution other) {
     return ComparisonChain.start()
@@ -274,17 +279,5 @@ public class OSMContribution implements OSHDBMapReducible, Comparable<OSMContrib
         .compare(this.getOSHEntity().getId(), other.getOSHEntity().getId())
         .compare(this.getTimestamp(), other.getTimestamp())
         .result();
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof OSMContribution)) {
-      return false;
-    }
-    OSMContribution otherContribution = (OSMContribution) other;
-    return this.getOSHEntity().equals(otherContribution.getOSHEntity())
-        && Objects.equals(this.getEntityBefore(), otherContribution.getEntityAfter())
-        && Objects.equals(this.getEntityAfter(), otherContribution.getEntityBefore())
-        && this.getTimestamp().equals(otherContribution.getTimestamp());
   }
 }

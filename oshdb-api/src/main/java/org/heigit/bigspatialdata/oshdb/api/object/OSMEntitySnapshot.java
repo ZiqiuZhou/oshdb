@@ -1,6 +1,8 @@
 package org.heigit.bigspatialdata.oshdb.api.object;
 
 import com.google.common.collect.ComparisonChain;
+import com.google.common.hash.HashCode;
+import java.util.Objects;
 import javax.annotation.Nonnull;
 import org.heigit.bigspatialdata.oshdb.osh.OSHEntity;
 import org.heigit.bigspatialdata.oshdb.osm.OSMEntity;
@@ -84,6 +86,11 @@ public class OSMEntitySnapshot implements OSHDBMapReducible, Comparable<OSMEntit
     return data.oshEntity;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * Note: this class has a natural ordering that is inconsistent with equals.
+   */
   @Override
   public int compareTo(@Nonnull OSMEntitySnapshot other) {
     return ComparisonChain.start()
@@ -91,16 +98,5 @@ public class OSMEntitySnapshot implements OSHDBMapReducible, Comparable<OSMEntit
         .compare(this.getOSHEntity().getId(), other.getOSHEntity().getId())
         .compare(this.getTimestamp(), other.getTimestamp())
         .result();
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof OSMEntitySnapshot)) {
-      return false;
-    }
-    OSMEntitySnapshot otherSnapshot = (OSMEntitySnapshot) other;
-    return this.getOSHEntity().equals(otherSnapshot.getOSHEntity())
-        && this.getEntity().equals(otherSnapshot.getEntity())
-        && this.getTimestamp().equals(otherSnapshot.getTimestamp());
   }
 }
