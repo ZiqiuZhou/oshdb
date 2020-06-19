@@ -92,4 +92,15 @@ public class OSMEntitySnapshot implements OSHDBMapReducible, Comparable<OSMEntit
         .compare(this.getTimestamp(), other.getTimestamp())
         .result();
   }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof OSMEntitySnapshot)) {
+      return false;
+    }
+    OSMEntitySnapshot otherSnapshot = (OSMEntitySnapshot) other;
+    return this.getOSHEntity().equals(otherSnapshot.getOSHEntity())
+        && this.getEntity().equals(otherSnapshot.getEntity())
+        && this.getTimestamp().equals(otherSnapshot.getTimestamp());
+  }
 }

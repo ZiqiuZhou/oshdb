@@ -275,4 +275,16 @@ public class OSMContribution implements OSHDBMapReducible, Comparable<OSMContrib
         .compare(this.getTimestamp(), other.getTimestamp())
         .result();
   }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof OSMContribution)) {
+      return false;
+    }
+    OSMContribution otherContribution = (OSMContribution) other;
+    return this.getOSHEntity().equals(otherContribution.getOSHEntity())
+        && Objects.equals(this.getEntityBefore(), otherContribution.getEntityAfter())
+        && Objects.equals(this.getEntityAfter(), otherContribution.getEntityBefore())
+        && this.getTimestamp().equals(otherContribution.getTimestamp());
+  }
 }
