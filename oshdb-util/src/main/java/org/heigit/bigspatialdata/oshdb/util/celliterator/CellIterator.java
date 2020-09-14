@@ -576,7 +576,7 @@ public class CellIterator implements Serializable {
       List<OSHDBTimestamp> modTs =
           OSHEntities.getModificationTimestamps(oshEntity, osmEntityFilter, changesetTs);
 
-      if (!modTs.isEmpty() || !timeInterval.intersects(
+      if (modTs.isEmpty() || !timeInterval.intersects(
           new OSHDBTimestampInterval(modTs.get(0), modTs.get(modTs.size() - 1))
       )) {
         // ignore osh entity because it's edit history is fully outside of the given time interval
